@@ -1,0 +1,7 @@
+include <mx>
+
+
+procedure shouldNotCheck(){
+	//Print tests should not verify all their models...
+	return true;
+}

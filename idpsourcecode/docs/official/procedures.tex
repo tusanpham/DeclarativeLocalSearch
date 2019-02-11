@@ -1,0 +1,323 @@
+
+\section{Procedures}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Declaring a procedure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+A procedure with name {\tt MyProc} and arguments {\tt A1}, \ldots, {\tt An} is declared by 
+\begin{lstlisting}
+	procedure MyProc(A1,...,An) {
+		// contents of the procedure
+	}
+\end{lstlisting}
+Inside a procedure, any chunk of Lua code can be written. For Lua's reference manual, see \url{http://www.lua.org/manual/5.1/}. In the following, we assume that the reader is familiar with the basic concepts of Lua. Like in most programming languages, a procedure should be declared before it can be used in other procedures (either in the same file or in earlier included files). There is one exception to this: procedures in the global namespace (for example, all built-in procedures) can always be used, no matter what.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{\idp types}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Besides the standard types of variables available in Lua, the following extra types are available in \idp procedures.
+\begin{description}
+	\item[sort] A set of sorts with the same name. Can be used as a single sort if the set is a singleton.
+	\item[predicate\_symbol] A set of predicates with the same name, but possibly with different arities. Can be used as a single predicate if the set is a singleton. If {\tt P} is a predicate\_symbol and {\tt n} an integer, then {\tt P/n} returns a predicate\_symbol containing all predicates in {\tt P} with arity {\tt n}. If {\tt s1}, \ldots, {\tt sn} are sorts, then {\tt P[s1,...,sn]} returns a predicate\_symbol containing all predicates $Q/n$ in {\tt P}, such that the $i$'th sort of $Q$ belongs to the set {\tt si}, for $1 \leq i \leq n$.
+	\item[function\_symbol] A set of first-order functions with the same name, but possibly with different arities. Can be used as a single first-order function if the set is a singleton. If {\tt F} is a function\_symbol and {\tt n} an integer, then {\tt F/n:1} returns a function\_symbol containing all function in {\tt F} with arity {\tt n}. If {\tt s1}, \ldots, {\tt sn}, {\tt t} are sorts, then {\tt F[s1,...,sn:t]} returns a function\_symbol containing all functions $G/n$ in {\tt F}, such that the $i$'th sort of $F$ belongs to the set {\tt si}, for $1 \leq i \leq n$, and the output sort of $G$ belongs to {\tt t}.
+	\item[symbol] A set of symbols of a vocabulary with the same name. Can be used as if it were a sort, predicate\_symbol, or function\_symbol.
+	\item[vocabulary] A vocabulary. If {\tt V} is a vocabulary and {\tt s} a string, {\tt V[s]} returns the symbols in {\tt V} with name {\tt s}. 
+	\item[compound] A domainelement of the form $F(d_1,\ldots,d_n)$, where $F$ is a first-order function and $d_1$, \ldots, $d_n$ are domain elements.
+	\item[tuple] A tuple of domain elements. {\tt T[n]} returns the {\tt n}'th element in tuple {\tt T} (This is 1-based, thus the first element is referred to as {\tt T[1]}).
+	\item[predicate\_table] A table of tuples of domain elements.
+	\item[predicate\_interpretation] An interpretation for a predicate. If {\tt T} is a predicate\_interpretation, then {\tt T.ct}, {\tt T.pt}, {\tt T.cf}, {\tt T.pf} return a predicate\_table containing, respectively, the certainly true, possibly true, certainly false, and possibly false tuples in {\tt T}. % HIER ONTBREEKT __newindex
+	\item[function\_interpretation] An interpretation for a function. {\tt F.graph} returns the predicate\_interpretation of the graph associated to the function\_interpretation {\tt F}. % HIER ONTBREEKT __newindex en __call
+	\item[structure] A first-order structure. To obtain the interpretation of a sort, singleton predicate\_symbol, or singleton function\_symbol {\tt symb} in structure {\tt S}, write {\tt S[symb]}.
+	\item[theory] A logic theory.
+	\item[options] A set of options.
+	\item[namespace] A namespace.
+	\item[overloaded] An overloaded object.
+\end{description}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Built-in procedures}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+A lot of procedures are already built-in. The command \code{help()} gives you an overview of all available sub-namespaces, procedures,\ldots. The \code{stdspace} namespace contains all built-in procedures.
+\subsubsection{stdspace}
+The \code{stdspace} contains the following procedures:
+\begin{description}
+\item[elements(d)]
+	Returns a procedure, stopargument, and a beginindex (hence, a Lua-iterator) such that
+	``for e in elements(d) do ... end'' 
+	iterates over all elements in the given domain d.
+\item[help(namespace)]
+	List the procedures in the given namespace.
+\item[idptype(something)]
+	Returns custom typeids for first-class idp citizens.
+\item[tuples(table)]
+	Returns a Lua-iterator such that
+	``for t in tuples(table) do ... end''
+	iterates over all tuples in the given predicate table.
+\end{description}
+All procedures in \code{stdspace} are included in the global namespace and hence can be called by \code{procedure()} instead of by \code{stdspace.procedure()}.
+
+Furthermore: \code{stdspace} contains the following subnamespaces:
+\begin{description}
+ \item[idpintern]
+ \item[inferences]
+ \item[options]
+ \item[structure]
+ \item[theory]
+ \item[vocabulary]
+\end{description}
+
+\subsubsection{idpintern}
+This namespace contains procedures that are either only for internal use or still under development / testing. 
+Using them is at your own risk.  
+\code{idpintern} is not included in the global namespace; help for idpintern can be obtained by \code{help(stdspace.idpintern)}.
+
+\subsubsection{inferences}
+The \code{inferences} namespace and all its procedures are included in the global namespace. Hence \code{inferences.xxx} should never be used. This namespace contains several inference methods:
+\begin{description}
+	\item[allmodels(theory,structure)] 
+		Returns all models of the theory that extend the given structure.
+	\item[calculatedefinitions(theory,structure)]
+		Make the structure more precise than the given one by evaluating all definitions with known open symbols. This procedure works recursively: as long as some definition of which all open symbols are known exists, it calculates the definition (possibly deriving open symbols of other definitions). This procedure returns a new structure or nil if inconsistency is detected.
+	\item[calculatedefinitions(theory,structure,vocabulary)]
+		Similar to calculatedefinitions(theory,structure), but only calculates definitions of symbols in the given vocabulary. This procedure returns a new structure or nil if inconsistency is detected.
+	\item[explainunsat(theory, structure, vocabulary)]
+		Given input structure $S_i$, input theory $T_i$ and vocabulary $V_i$, this procedure searches for a structure $S_O$ and a theory $T_O$ such that the following hold:
+		\begin{description}
+		\item $S_O$ is less precise than $S_i$.
+		\item $T_O$ is entailed by $T_i$ (obtained by instantiating universal quantifiers in rules and sentences)
+		\item $S_O$ equals $S_i$ on symbols not in $V_i$
+		\item $S_O$ is maximally imprecise with respect to the above criteria
+		\item $T_O$ is maximally restrictive w r t the above criteria
+		\end{description}
+Furthermore, this procedure also prints $S_O$ and $T_O$ in a human-readable way
+(note: with respect to definitions, the entailment is not always strictly respected since it is currently impossible to partially define symbols)
+
+	\item[ground(theory,structure)]
+ 		Create the reduced grounding of the given theory and structure. 
+ 	\item[groundeq(theory,structure,modeleq)]
+ 		Create the reduced grounding of the given theory and structure. modeleq is a boolean parameter:  whether or not the grounding should preserve the number of models (it always preserves satisfiability but might not preserve the number of models if modeleq is false).
+ 	\item[printgrounding(theory,structure)]
+ 		Print the reduced grounding of the given theory and structure.
+ 		MEMORY EFFICIENT: does not store the grounding internally.
+ 		
+ 	\item[groundpropagate(theory,structure)]
+ 		Return a structure, made more precise than the input by grounding and unit propagation on the theory.
+		Returns nil when propagation makes the givens structure inconsistent.
+	\item[optimalpropagate(theory,structure)]
+ 		Return a structure, made more precise than the input by generating all models and checking which literals always have the same truth value
+ 		This propagation is complete: everything that can be derived from the theory will be derived. 
+ 		Returns nil when propagation results in an inconsistent structure.
+	\item[propagate(theory,structure)]
+ 		Returns a structure, made more precise than the input by doing symbolic propagation on the theory.
+ 		Returns nil when propagation results in an inconsistent structure.
+ 	\item[initialise(theory,structure)] can only be called with an LTC theory. Performs initialisation for the progression inference\footnote{See ``Simulating Dynamic Systems Using Linear Time Calculus Theories'' (Bogaerts et al., 2014)}.
+	It returns a table consisting of a number (depending on stdoptions.nbmodels) of models, and the used bistate theory, the initial theory, the bistate vocabulary and the initial vocabulary.
+ 	\item[progress(theory,structure)] can only be called with an LTC theory. Performs one progression step for the progression inference$^1$ 
+	\item[isinvariant(theory, theory)] uses a theorem prover (set by stdoptions.provercommand) to try to prove that the second theory is an invariant of the first theory. The second theory should be of the form : $\forall t[Time]:\varphi[t]$, where $\varphi$ can be a single-state formula or a bistate formula and the first should be an LTC theory. It uses the methods presented in progression inference$^1$.
+	\item[isinvariant(theory, theory, structure)] uses the model expander to prove that the second theory is an invariant of the first theory in the context of the given structure. The second theory should be of the form : $\forall t[Time]:\varphi[t]$, where $\varphi$ can be a single-state formula or a bistate formula and the first should be an LTC theory. It uses the methods presented in progression inference$^1$.
+	\item[minimize(theory,structure,term,vocabulary)]
+	The structure can interpret a subvocabulary of the vocabulary of the theory, the vocabulary of the theory and the term have to be identical.
+	The fourth argument (vocabulary) is optional and allows you to specify a subvocabulary containing only the symbols in which you're interested.			
+	It returns (1) a table of all models of the theory that extend the given structure and such that the term is minimal,
+	(2) a boolean indicating whether an optimum was found,
+	(3) the optimal value of the term,
+	and, if stdoptions.trace == true, (4) a trace of the solver.
+	\item[modelIterator(theory, structure, vocabulary)]
+			Returns an iterator iterating over all possible two-valued models satisfying the given theory. See modelexpand for more information.
+\begin{lstlisting}
+iterator = modelIterator(T, S);
+print("1: ", iterator());
+print("2: ", iterator());
+for model in iterator do //print all other models
+	print(model);
+end
+\end{lstlisting}
+	\item[modelexpandpartial(theory,structure, vocabulary)]
+		Apply model expansion to theory T, structure S. The structure can interpret a subvocabulary of the vocabulary of the theory.
+ 		The result is a table of (possibly three-valued) structures that are more precise then S and that satisfy T  and, if stdoptions.trace == true, a trace of the solver.
+		The third argument (vocabulary) is optional and allows you to specify a subvocabulary containing only the symbols in which you're intersted.
+	\item[modelexpand(theory,structure,vocabulary)]
+ 		Apply model expansion to theory T, structure S. The structure can interpret a subvocabulary of the vocabulary of the theory.
+ 		The result is a table of two-valued structures that are more precise then S and that satisfy T and, if stdoptions.trace == true, a trace of the solver.
+		(this procedure is equivalent to first calling modelexpandpartial and subsequently calling alltwovaluedextensions) 
+		The third argument (vocabulary) is optional and allows you to specify a subvocabulary containing only the symbols in which you're intersted.
+	\item[onemodel(theory,structure)]
+		Does model expansion but only searches for one model (no matter what the \code{nbmodels} option is set to). Returns this structure (in contrast to the standard modelexpansion which returns a list of structures).
+	\item[printunsatcore(theory,structure)]
+		Finds a theory that is a minimal ``subset'' of the given theory that is unsat in the given structure, or, in other words, a ``core''; it then prints this theory with 
+		references to how it was obtained from the given theory.
+		A subset in this respect is a subset of all instantiated formulas in conjunctive context in the theory and instantiated rules 
+		(either all rules defining a specific domain atom/term or none of them).
+		Currently does not take constraints implied by the vocabulary (e.g., function constraints) or the structure (e.g., type interpretations) into account.
+	\item[printmodels(list)]
+		Prints a given list of models or prints unsatisfiable if the list is empty.
+	\item[query(query,structure)]
+ 		Generate all solutions to the given query in the given structure. The result is the set of element-tuples that certainly satisfy the query in the structure.
+	\item[refinedefinitions(theory,structure)]
+		Make the structure more precise than the given one by refining all defined symbols using the definitions until fixpoint. This procedure returns a new structure or nil if inconsistency is detected.
+	\item[sat(theory,structure)]
+		Checks satisfiability of the given theory-structure combination. Returns true if and only if there exists a model extending the structure and satisfying the theory.
+	\item[unsatstructure(theory,structure,vocabulary)]
+		Returns a structure S that is less precise than the input structure such that the given theory has no models that expand S. Furthermore S is a precision-minimal structure with this property. If the optional third argument is provided, the resulting structure S must furthermore equal the input structures on all symbols not in the provided vocabulary.
+	\item[value(formula/term,structure)]
+		Evaluate a variable-free formula or term in a two-valued structure, returning true/false for a formula and a domainelement or nil for a term.
+	\item[equal(obj,obj)]
+		Compares the contents of two domain elements or tables of domain elements to see whether they are the same.		
+\end{description}
+
+\subsubsection{options}
+Like the \code{inferences} namespace, the \code{options} namespace and all its procedures are included in the global namespace. This namespace consists of the following procedures:
+
+\begin{description}
+	\item[getoptions()]
+ 		Get the current options.
+	\item[newoptions()]
+ 		Create new options, equal to the standard options.
+	\item[setascurrentoptions(options)]
+ 		Sets the given options as the current options, used by all other commands.
+\end{description}
+
+\subsubsection{structure}
+Also this  namespace and all its procedures are included in the global namespace. Here, you can find several procedures for manipulating logical structures.
+
+\begin{description}
+	\item[alltwovaluedextensions(structure)] This procedures takes one (three-valued) structure and returns all structures over the same vocabulary that extend the given structure and are two-valued.
+	\item[alltwovaluedextensions(table)]
+		This procedures takes a table of structures and returns all two-valued extensions of any of the given structures.
+	\item[clean(structure)]
+		Modifies the given structure (the structure is the same, but its representation changes): transforms fully specified three-valued relations into two-valued ones.  For example if \code{P} has domain \code{[1..2]} and in the given structure, \code{P<ct> = \{1\}, P<cf> = \{2\}}, in the end, \code{P} is \code{\{1\}}.
+	\item[clone(structure)]
+		Returns a structure identical to the given one.
+	\item[isconsistent(structure)]
+ 		Check whether the structure is consistent.
+	\item[makefalse(predicate\_interpretation,table)]
+ 		Sets all tuples of the given table to false, independent of the previous values (so this will never make the table inconsistent).
+ 		Modifies the table-interpretation.
+	\item[makefalse(predicate\_interpretation,tuple)]
+ 		Sets the interpretation of the given tuple to false, independent of the previous value (so this will never make the table inconsistent).
+ 		Modifies the table-interpretation.
+	\item[maketrue(predicate\_interpretation,table)]
+ 		Sets all tuples of the given table to true, independent of the previous values (so this will never make the table inconsistent).
+ 		Modifies the table-interpretation.
+	\item[maketrue(predicate\_interpretation,tuple)]
+ 		Sets the interpretation of the given tuple to true, independent of the previous value (so this will never make the table inconsistent).
+ 		Modifies the table-interpretation.
+	\item[makeunknown(predicate\_interpretation,table)]
+ 		Sets all tuples of the given table to unknown, independent of the previous values (so this will never make the table inconsistent).
+ 		Modifies the table-interpretation.
+	\item[makeunknown(predicate\_interpretation,tuple)]
+ 		Sets the interpretation of the given tuple to unknown, independent of the previous value (so this will never make the table inconsistent).
+ 		Modifies the table-interpretation.
+	\item[merge(structure,structure)]
+ 		Create a new structure which is the result of combining both input structures. The union of the elements in the sorts are taken. For predicates/functions, 
+ 		the union of the certainly falses and certainly trues are taken. This means that the resulting structure can be inconsistent (if an element was present in the cf
+ 		of one structure and the ct of another) or can become three-valued, even if the two original ones are two-valued (if a sort is extended through one argument, and 
+ 		the predicates interpreting that sort in the other argument, are not extended.
+	\item[newstructure(vocabulary,string)]
+ 		Create an empty structure with the given name over the given vocabulary.
+ 		
+ 	\item[createdummytuple()]
+		Create an empty tuple.
+	
+	\item[iterator(domain)]
+ 		Create an iterator for the given sorttable.
+	\item[iterator(predicate\_table)]
+ 		Create an iterator for the given predtable.
+	\item[size(predicate\_table)]
+ 		Get the size of the given table.
+ 		
+ 	\item[range(number,number)]
+ 		Create a domain containing all integers between First and Last.
+\end{description}
+
+
+\subsubsection{theory}
+The \code{theory} namespace and all its procedures are included in the global namespace. It contains methods for manipulating theories, most of which modify the given theory.
+\begin{description}
+	\item[clone(theory)]
+		Returns a theory identical to the given one.
+	\item[completion(theory)]
+		Add definitional completion of all the definitions in the theory to the given theory. Modifies its argument.
+	\item[flatten(theory)]
+		Rewrites formulas with the same operations in their child formulas by reducing the nesting. For example $a \wedge (b\wedge c)$ will be rewritten to $a\wedge b \wedge c$.
+		Modifies the given theory. 
+	\item[merge(theory,theory)]
+ 		Create a new theory which is the result of combining (the conjunction of) both input theories.
+	\item[pushnegations(theory)]
+ 		Push negations inwards until they are right in front of literals.
+ 		Modifies the given theory.
+	\item[removecardinalities(theory,int)]
+		Replaces atoms consisting of a cardinality term compared with an integer term, if the latter is smaller or equal to the given integer (or if that is zero), with an equivalent FO formula.
+ 		Modifies the given theory.
+	\item[removenesting(theory)]
+ 		Move nested terms out of predicates (except for the equality-predicate) and functions.
+ 		Modifies the given theory.
+\end{description}
+
+\subsubsection{vocabulary}
+The \code{vocabulary} namespace and all its procedures are included in the global namespace. It contains methods for getting and setting vocabularies of a structure, retrieving symbols from a vocabulary, and inspecting symbol properties.
+\begin{description}
+	\item[getvocabulary(query)]
+		Returns the vocabulary of the given object.
+	\item[getvocabulary(structure)]
+		Returns the vocabulary of the given object.
+	\item[getvocabulary(term)]
+		Returns the vocabulary of the given object.
+	\item[getvocabulary(theory)]
+		Returns the vocabulary of the given object.
+	\item[setvocabulary(structure,vocabulary)]
+		Changes the vocabulary of a structure to the given one.
+	\item[newvocabulary(string)]
+		Create an empty vocabulary with the given name.
+	\item[getfunctions(vocabulary)]
+		Returns a table with all non built-in function symbols in the vocabulary.
+	\item[getpredicates(vocabulary)]
+		Returns a table with all the predicate symbols in the vocabulary, excluding type predicates and built-in predicates.
+	\item[gettypes(vocabulary)]
+		Returns a table with all non built-in types in the vocabulary.
+	\item[gettyping(function\_symbol)]
+		Returns a table containing, in-order, the types of a given function symbol.
+	\item[gettyping(predicate\_symbol)]
+		Returns a table containing, in-order, the types of a given predicate symbol.
+	\item[name(function\_symbol)]
+		Returns the name of a given function symbol.
+	\item[name(predicate\_symbol)]
+		Returns the name of a given predicate symbol.
+	\item[name(type)]
+		Returns the name of a given type.
+\end{description}
+
+
+\subsubsection{Miscellaneous}
+\todo{WHY is the parse method directly in global\_namespace?}
+\begin{description}
+	
+	
+	\item[parse(string)]
+ 		Parses the given file and adds its information into the datastructures.
+
+\end{description}
+
+
+\subsubsection{The table\_utils library}
+The table\_utils standard library file can be include by 
+\begin{lstlisting}
+	include <table_utils>
+\end{lstlisting}
+It contains several useful commands for manipulating tables, converting predicate tables to lua-tables.
+
+\begin{description}
+ \item[printtuples(name, table)]
+	      Given a predicate name and a relationship table, prints all tuples in the table
+ \item[tablecontains(table, element)]
+	      Returns true if a given table contains a certain element
+ \item[totable(input)]
+	      Converts the input to a lua-table. The input can be a domain, predicate table or a tuple.
+%TODO expand
+\end{description}
+
+\todo{document}
+

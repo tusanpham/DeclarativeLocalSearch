@@ -1,0 +1,289 @@
+include <mx>
+include "standardoptions.idp"
+
+procedure mxnobounds(){
+  standardoptions()
+	stdoptions.groundwithbounds = false	
+	stdoptions.liftedunitpropagation = false
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+// NOTE: only based on lazy tseitin delaying!!!!
+// NOTE: never enable delaying here which depends on well-founded definitions!
+procedure mxlazy(){
+  standardoptions()
+	stdoptions.tseitindelay = true
+	stdoptions.timeout = 7
+	stdoptions.xsb=false
+	return run(T)
+}
+
+procedure mxlazywithoutcp(){
+  standardoptions()
+	stdoptions.cpsupport = false
+	stdoptions.tseitindelay = true
+	stdoptions.timeout = 7
+	stdoptions.xsb=false
+	return run(T)
+}
+
+// NOTE: never enable delaying here which depends on well-founded definitions!
+procedure mxverylazy(){
+  standardoptions()
+  stdoptions.cpsupport=false
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation=false
+	stdoptions.lazyheur=true
+	stdoptions.relevancewatched=true
+	stdoptions.existsexpansion=2
+	stdoptions.lazysizelimit=3
+	stdoptions.satdelay=true
+	stdoptions.tseitindelay=true
+	stdoptions.xsb=false
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxfuncdetect(){
+  standardoptions()
+	stdoptions.functiondetection = true
+	stdoptions.timeout = 100
+	stdoptions.verbosity.functiondetection=0
+	stdoptions.verbosity.entails=0
+	return run(T)
+}
+
+procedure mxnoboundslong(){
+  standardoptions()
+	stdoptions.groundwithbounds = false
+	stdoptions.liftedunitpropagation = false
+	stdoptions.timeout = 200
+	return run(T)
+}
+
+procedure mxwithbounds(){
+  standardoptions()
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithmeta(){
+  standardoptions()
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	metastruc = tometa(T)
+	mv = getvocabulary(metastruc)
+	T = frommeta(V, mv::sentence, metastruc)
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithxsb(){
+  standardoptions()
+	stdoptions.xsb=true
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithapproxdefs(){
+  standardoptions()
+	stdoptions.xsb=true
+  	stdoptions.approxdef="cheap"
+  	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithboundswithoutLUP(){
+  standardoptions()
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = false
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxnonreduced(){
+  standardoptions()
+	stdoptions.reducedgrounding = false
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithoutcp(){
+  standardoptions()
+	stdoptions.cpsupport = false
+	stdoptions.cpgroundatoms = false
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithfullcp(){
+  standardoptions()
+	stdoptions.cpsupport = true
+	stdoptions.cpgroundatoms = true
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+
+procedure mxwithSharedTseitins(){
+  standardoptions()
+	stdoptions.sharedtseitins = true
+	stdoptions.groundwithbounds = true
+	stdoptions.liftedunitpropagation = true
+	stdoptions.timeout = 7
+	return run(T)
+}
+
+procedure mxwithsymm(){
+  standardoptions()
+	stdoptions.timeout = 7
+	stdoptions.groundwithbounds = false
+	stdoptions.liftedunitpropagation = false
+	stdoptions.symmetrybreaking = "static"
+	
+	stdoptions.showwarnings = false // Do not print warnings that more models MIGHT exist
+	
+	stdoptions.nbmodels = getExpectedNbOfModels()+1 // NOTE: prevents finding tons of models and timing out when bugs are present
+	solutions = modelexpand(T, S, Vout)
+	standardoptions()
+	
+	if(#solutions>getExpectedNbOfModels()) then
+		io.stderr:write("Found more than "..getExpectedNbOfModels().." models.\n")
+		return 0
+	else
+		io.stderr:write("Found "..#solutions..", expected "..getExpectedNbOfModels().." models.\n")
+		return check(solutions)
+	end
+}
+
+procedure mxCardFO(){
+  standardoptions()
+	newT = clone(T)
+	removecardinalities(newT,10)
+	return run(newT)
+}
+
+procedure run(theory) {
+	if(theory == nil) then
+		//For backwards compatibility with tests calling run()
+		theory = T
+	end
+	if(allowed~=nil) then
+		if (not allowed()) then 
+			print("NOT running this test in this context!")
+			return 1
+		end
+	end
+	
+	stdoptions.verbosity.solving=0
+	stdoptions.verbosity.grounding=0
+	stdoptions.verbosity.transformations=0
+	stdoptions.verbosity.creategrounders=0
+	
+	stdoptions.mxtimeout = 2000
+	
+	stdoptions.nbmodels = getExpectedNbOfModels()+1 // NOTE: prevents finding tons of models and timing out when bugs are present
+	solutions = modelexpand(theory, S, Vout)
+	io.stderr:write("MX done\n")
+	standardoptions()
+	if(#solutions~=getExpectedNbOfModels()) then
+		if(#solutions>getExpectedNbOfModels()) then
+			io.stderr:write("Found more than "..getExpectedNbOfModels().." models.\n")
+		else
+			io.stderr:write("Found "..#solutions..", expected "..getExpectedNbOfModels().." models.\n") 
+		end
+		for i,v in ipairs(solutions) do
+			io.stderr:write(tostring(v))
+		end
+		check(solutions)
+		return 0
+	else
+		io.stderr:write("Found "..#solutions..", expected "..getExpectedNbOfModels().." models.\n")
+		return check(solutions)
+	end	
+}
+
+procedure check(solutions){
+	//avoid bootstrapping code while checking (too expensive to do it over and over again)
+	stdoptions.postprocessdefs = false
+	stdoptions.splitdefs = false
+	if(shouldNotCheck~=nil) then
+		print("NOTE: solutions unchecked because too expensive!")
+		return 1;
+	end
+	for i,v in ipairs(solutions) do
+		structure = v
+		if(Vout~=nil and Vout~=V)then
+			setvocabulary(structure,V)
+		end
+		if(not isconsistent(merge(S,structure)) or not value(T, structure)) then
+			io.stderr:write("Found an invalid solution:\n")
+			io.stderr:write(tostring(structure))
+			return 0
+		end
+	end
+	return 1
+}
+procedure checkmodelsandnonmodels() {
+	local maxNbCheckedModels = 50
+	if(shouldNotCheck~=nil) then
+		print("NOTE: models unchecked because too expensive!")
+		return 1;
+	end
+	stdoptions.verbosity.solving=0
+	stdoptions.verbosity.grounding=0
+	stdoptions.timeout=10 //Higher timeout since lots of checks here
+	stdoptions.nbmodels=maxNbCheckedModels+1
+	structures = nbModelsTwoValuedExtensions(S)
+	if(#structures > maxNbCheckedModels) then
+		print("NOTE: models unchecked because too expensive!")
+		return 1;
+	end
+	models = {}
+	nonmodels = {}
+	for i,structure in ipairs(structures) do
+		if(#modelexpand(T, structure, Vout)==1) then
+			table.insert(models,structure)
+		else
+			table.insert(nonmodels,structure)
+		end
+	end
+	if(#models > getExpectedNbOfModels()) then
+		io.stderr:write("At least one of these is not a model, but was not detected as such.\n")
+		for i,structure in ipairs(models) do
+			io.stderr:write(tostring(structure))
+		end
+		return 0
+	elseif(#models < getExpectedNbOfModels()) then
+		io.stderr:write("At least one of these is a model, but was not detected as such.\n")
+		for i,structure in ipairs(nonmodels) do
+			io.stderr:write(tostring(structure))
+		end
+		return 0
+	end
+	return 1
+}
+
+procedure nbmodelsOptionVerification() {
+	if getExpectedNbOfModels()<2 then return 1; end
+	stdoptions.nbmodels = getExpectedNbOfModels()-1
+	solutions = modelexpand(T, S, Vout)
+	if(#solutions==getExpectedNbOfModels()-1) then
+		return 1
+	else 
+		return 0
+	end
+}

@@ -1,0 +1,98 @@
+\section{Options}
+\todo{How does the verbosity work?}
+The \idp system has various options. To print the current values of all options, use \code{print(getoptions())}.  To set an option, you can use the following lua-code
+\begin{lstlisting}
+	stdoptions.MyOption = MyValue
+\end{lstlisting}
+where \code{MyOption} is the name of the option and \code{MyValue} is the value you want to give it. If you want to have multiple option sets, you can make them with them with
+\begin{lstlisting}
+	FirstOptionSet = newOptions()
+	SecondOptionSet = newOptions()
+	FirstOptionSet.MyOption = MyValue
+	SecondOptionSet.MyOption = MyValue
+\end{lstlisting}
+To activate an option set, use the procedure \code{setascurrentoptions(MyOptionSet)}.  From that moment, \code{MyOptionSet} will be used in all comands.
+
+\subsection{Verbosity options}
+\begin{description}
+	\item[{grounding = [0..max(int)]}] Verbosity of the grounder. The higher the verbosity, the more debug information is printed.
+	\item[{solving = [0..max(int)]}] Like groundverbosity, but controls the verbosity of \minisatid
+	\item[{propagation = [0..max(int)]}] Like grounding, but controls the verbosity of the propagation.
+	\item[{symmetrybreaking = [0..max(int)]}] Like grounding, but controls the verbosity of the symmetry detection and breaking routine.
+	\item[{approxdef = [0..5]}] Verbosity of the module that uses an approximating definition to perform approximation prior to grounding and solving.
+	\item[{functiondetection = [0..max(int)]}] Verbosity of the module that detects functions and rewrites a theory accordingly. 
+	\item[{calculatedefinitions = [0..5]}] Verbosity of the module that calculates definitions prior to grounding and solving. 
+		\begin{itemize}
+		\item 1 or greater: print when calculating the definition starts and ends. Also prints the input- and outputstructure of the process.
+		\item 2 or greater: print for each definition separately when it is being calculated and print when it is being calculated using \xsb. Also prints the duration (in ms) of sub-steps in the calculation of the definition.
+		\item 3 or greater: print \xsb code that will be used to calculate the definitions.
+		\item 5 or greater: print queries that are being sent to \xsb and the answer tuples they return.
+		\end{itemize}
+\end{description}
+
+\subsection{Modelexpansion options}
+\begin{description}
+	\item[{nbmodels = [0..max(int)]}] Set the number of models wanted from the modelexpansion inference.  If set to 0, all models are returned.
+	\item[{trace = [false, true]}] If true, the procedure modelexpand produces also an execution trace of \minisatid.
+	\item[{cpsupport = [false, true]}] If true, constants can occur in the grounding, which are taken care of through integration with Constraint Programming techniques. 
+	\item[{cpgroundatoms = [false, true]}] If true, the grounding can be full ground FO(.), which has an even smaller grounding (but might have reduced propagation).
+	\item[{functiondetection = [false, true]}] If true, function detection is used to replace predicate symbols by function symbols with smaller arity.
+	\item[{skolemize = [false, true]}] If true, existential quantification in sentences is replaced by introducing new function symbols. Only advantageous with cpsupport on.
+	\item[{tseitindelay = [false, true]}] If true, grounding can be delayed by lazily expanding quantifications and disjunctions/conjunctions.
+	\item[{satdelay = [false,true]}] If true, grounding can be delayed by maintaining justifications for non-ground sentences and rules.
+% 	\item[{postprocessdefs = [false,true]}] If true, definitions that can be evaluated efficiently after search or forgotten entirely are removed from the theory and are applied to structures found.
+	%\item[{sharedtseitin = [false, true]}] Enable/disable a Tseitin transformation where subformulas are shared (hence some equivalent subformulas and certainly all syntactical equal subformulas have the same tseitin).
+		\item[{symmetrybreaking = [none,static]}] If the symmetry breaking option "static" is chosen, an automatic symmetry detection routine detects sets of interchangeable domain elements. These induce symmetry groups on the set of models to the modelexpansion problem, which are broken using static symmetry breaking constraints. Activating this option may invalidate some models, but if the problem is satisfiable, at least one model satisfies the symmetry breaking constraints.
+\end{description}
+
+\subsection{Propagation options}
+\begin{description}
+	\item[{groundwithbounds = [false, true]}] Enable/disable bounded grounding (if enabled, first do symbolic propagation to provide ct and cf bounds for formulas to reduce the size of the grounding in every inferences that grounds (groundpropagate/ground/modelexpand/...)).
+	\item[{longestbranch = [0..2147483647]}] The longest branch allowed in BDDs during propagation. The higher, the more precise the propagation will be (but also, the more time it will take).
+	\item[{nrpropsteps = [0..2147483647]}] The number of propagation steps used in the propagate-inference. The higher, the more precise the propagation will be (but also, the more time it will take).
+	\item[{relativepropsteps =  [false, true]}] If true, the total number of propagation steps is nrpropsteps multiplied by the number of formulas.
+\end{description}
+
+\subsection{Printing options}
+\begin{description}
+	\item[{language = [ecnf, idp, idp2 %latex, asp, txt
+				tptp]}] The language used when printing objects. Note, not all languages support all kinds of objects.
+	\item[{longnames = [false, true]}] If true, everything is printed with reference to their vocabulary.  For example, a predicate \code{P} from vocabulary \code{V} will be printed as \code{V::P} instead of \code{P}.
+\end{description}
+
+\subsection{Entailment options}
+\begin{description}
+	\item[{provercommand = string}] String is the command by which a theorem prover can be called (as on a command-line). It has to contain the placeholders \code{\%i} and \code{\%o} which will be replaced with the input and output file, respectively.
+	\item[{proversupportsTFA = [false, true]}] Should be set to true if the selected prover (using above command) supports to TFA syntax of the CASC competition (Typed Fo with Arithmetic). Otherwise FOF syntax (First-Order Formulas) will be used.
+\end{description}
+
+\subsection{General options}
+
+\begin{description}
+	%\item[{autocomplete = [false, true]}] Turn autocompletion of structures on or off
+	%\item[{cpsupport = [false, true]}] Enable/disable cp-support (running a cp-solver together with the SAT-solver)
+	%\item[{createtranslation = [false, true]}] \todo{watdoetdit?}
+	%\item[{groundlazily = [false, true]}] Enable/disable lazy grounding
+	%\item[{printtypes = [false, true]}] \todo{doet niets voor de moment?}
+	%\item[{provertimeout = [0..2147483647]}] \todo{?}
+	%\item[{showwarnings = [false, true]}] Enable/disable the warnings.
+	%\item[{symmetry = [0..2147483647]}] \todo{?} 1 is static, 0 is none, higher = ?
+	\item[{assumeconsistentinput = [false, true]}] If true, input structures are not checked for consistency (which can be expensive to verify). 
+	\item[{xsb = [false, true]}] Enable/disable the usage of \xsb.
+	\item[{timeout = [0..max(int)]}] Set the time after which an inference is requested to stop gracefully (in seconds, 0 indicates \emph{no} timeout).
+		In interactive mode, this is one lua call, otherwise the execution of the command supplied by ``-e'' (or the main procedure) is timed.
+		Whenever a timeout is reached, the inference is provided with 10 seconds to exit gracefully, otherwise the system aborts.
+	\item[{memoryout = [0..max(int)]}] Similar to the above, but monitors the memory usage (in Mb).				
+	\item[{mxtimeout = [0..max(int)]}] Similar to above, but only times calls to model expansion and minimization.
+		If any models have already been found, they are returned properly.
+		In case of model optimization, the best model(s) found to date are returned, not guaranteeing optimality has been proven.
+	\item[{mxmemoryout = [0..max(int)]}] Similar to the above, but monitors the memory usage (in Mb). 
+	\item[{seed = [0..max(int)]}] Set the seed for the random generator (used in the estimators for BDDs and in the SAT-solver).
+	\item[{approxdef = ["none", "complete", "cheap"]}]
+		\begin{itemize}
+		\item [none]: do not use any approximating definition
+		\item [complete]: use the complete approximating definition
+		\item [cheap]: use the approximating definition without certain expensive rules
+		\end{itemize}
+	\item[{randomvaluechoice = [false, true]}] Controls the solver: if set to true, the assignment to choice literals is random, if set to false, the solver default assigns false to choice literals.
+\end{description}

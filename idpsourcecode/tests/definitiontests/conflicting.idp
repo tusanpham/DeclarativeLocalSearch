@@ -1,0 +1,18 @@
+vocabulary V{
+	type x isa int
+	p(x)
+}
+
+theory T:V{
+	{ !x: p(x).}
+	{p(0).}
+}
+
+structure S:V{
+	x = {0..1}
+}
+
+procedure assertions(){
+	return consistent(0)
+}
+

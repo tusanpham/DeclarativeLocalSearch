@@ -1,0 +1,16 @@
+vocabulary V {
+	type A
+	P(A)
+}
+
+theory T : V {
+	{ P(1). }
+}
+
+structure S : V {
+	A = { 1..9 }
+}
+
+procedure main(){
+	return 1
+}

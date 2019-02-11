@@ -1,0 +1,24 @@
+vocabulary V {
+	type t isa int
+P(t)
+	c:t
+d:t
+}
+
+theory T:V{	
+	sum(1)=c.
+	sum(2,4,6,8)=d.
+}
+structure S:V{
+t={1..20}
+P={3..9}
+}
+
+procedure getExpectedNbOfModels(){
+	return 1
+}
+
+procedure shouldNotCheck(){
+	//Not checked because test  "checkmodelsandnonmodels" should not be ran on this instance (too many two-valued interpretations for buildbot)
+	return true
+}

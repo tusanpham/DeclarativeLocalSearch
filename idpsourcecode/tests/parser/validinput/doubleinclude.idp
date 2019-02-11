@@ -1,0 +1,17 @@
+include <mx>
+include <mx>
+
+vocabulary V {
+}
+
+theory T : V {
+}
+
+structure S : V{
+}
+
+procedure main(){
+	if onemodel(T, S) ~= nil then return 1
+	else return 0
+	end 
+}

@@ -1,0 +1,22 @@
+vocabulary V {
+	type x isa int
+	type y isa int
+	p
+	p(x)
+}
+
+theory T:V {
+}
+
+structure S:V {
+	x = {1..3}
+}
+
+procedure getExpectedNbOfModels() {
+	return 16
+}
+
+
+procedure doNotPrint(){
+	return true
+}

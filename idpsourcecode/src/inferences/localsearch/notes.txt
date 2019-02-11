@@ -1,0 +1,10 @@
+
+PredInter* iterate (function case)
+ for (auto ctit = inter_dec_vars->graphInter()->ct()->begin(); not ctit.isAtEnd(); ++ctit) {
+    inter_dec_vars->graphInter()->makeFalseExactly(tuple);
+
+
+
+# Create new inference:
+- src/external/commands/localsearch make changes
+- share/std/idp_intern.idp, change the corresponding procedure

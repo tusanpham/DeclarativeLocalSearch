@@ -1,0 +1,6 @@
+include <mx>
+
+procedure main(){
+	stdoptions.nbmodels=0
+	mx::printsols(allmodels(T, S))
+}

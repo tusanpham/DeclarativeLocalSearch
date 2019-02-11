@@ -1,0 +1,9 @@
+include <mx>
+
+vocabulary V{
+	type Struct isa
+}
+
+procedure main(){
+	return 1
+}

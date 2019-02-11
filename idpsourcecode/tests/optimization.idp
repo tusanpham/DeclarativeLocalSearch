@@ -1,0 +1,51 @@
+include <mx>
+
+// voc V, theory T, minimization term t, structure S
+// getExpectedAModel() if at least one model exists
+// additional theory T2 (should get better support in future): T2 = { t=optimumvalue. }
+
+procedure OptimizeWithoutSymBreaking() {
+	stdoptions.symmetrybreaking = "none"
+	return run()	
+}
+
+procedure OptimizeWithSymBreaking() {
+	stdoptions.symmetrybreaking = "static"
+	return run()
+}
+
+procedure OptimizeWithCP() {
+  stdoptions.cpsupport = true
+  return run()
+}
+
+procedure run() {
+	stdoptions.nbmodels = getExpectedNbOfModels()+1
+	stdoptions.timeout = 20
+	stdoptions.verbosity.grounding = 0
+	stdoptions.verbosity.solving = 0
+	
+	sols = minimize(T, S, t)
+	
+	if(stdoptions.symmetrybreaking=="none" and getExpectedNbOfModels() ~= #sols) then
+		io.stderr:write("Found "..#sols..", expected "..getExpectedNbOfModels().." models.\n")
+		return 0
+	elseif(stdoptions.symmetrybreaking~="none" and getExpectedNbOfModels() < #sols) then
+		io.stderr:write("Found "..#sols..", expected at most "..getExpectedNbOfModels().." models.\n")
+		return 0
+	elseif(stdoptions.symmetrybreaking~="none" and #sols == 0) then
+		io.stderr:write("Expected models, found none.\n")
+		return 0
+	end
+	
+	stdoptions.symmetrybreaking = "none"
+	
+	for i,model in pairs(sols) do
+		if(#modelexpand(T2, model)==0) then
+			io.stderr:write("Found an invalid optimum model.\n")
+			return 0
+		end
+	end
+	
+	return 1
+}

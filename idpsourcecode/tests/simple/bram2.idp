@@ -1,0 +1,27 @@
+vocabulary Vcalc {
+    P(float)
+}
+
+structure S : Vcalc {
+
+}
+
+
+theory T : Vcalc {
+    {
+        P(x) <- x = 1.
+    } 
+
+}
+
+include <table_utils>
+
+procedure main(){
+    stdoptions.xsb=true
+	P = calculatedefinitions(T,S)
+    if(totable(P[Vcalc::P].ct)[1] == nil ) then
+//table is empty!
+		return -1
+	end
+	return 1
+}

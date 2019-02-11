@@ -1,0 +1,139 @@
+/*
+ * Copyright 2007-2011 Katholieke Universiteit Leuven
+ *
+ * Use of this software is governed by the GNU LGPLv3.0 license
+ *
+ * Written by Broes De Cat and Maarten Marien, K.U.Leuven, Departement
+ * Computerwetenschappen, Celestijnenlaan 200A, B-3001 Leuven, Belgium
+ */
+
+%{
+#include <iostream>
+#include <vector>
+#include "external/ExternalUtils.hpp"
+using namespace std;
+
+#include "parser/ECNFScanner.hpp" 
+
+#define ET MinisatID::ECNFParser::token
+
+%}
+
+%option noyywrap never-interactive nounput nodefault
+%option prefix="ecnf"
+%option c++ yyclass="ECNFScanner"
+%option yylineno
+
+%s theory trans trans2
+
+ID			_*[A-Za-z]['a-zA-Z0-9_]*
+ATOMSTRING  _*[A-Za-z]['a-zA-Z0-9_]*
+ATOM2STRING  _*[A-Za-z]['a-zA-Z0-9_()/ ,]*
+INT			-?[0-9]+
+WHITESPACE	[\t\r ]*
+
+%%
+
+<*>^"c grounder error".*	{ throw MinisatID::idpexception("There was a grounding error, so no solving is possible.\n");}
+
+
+<*>^"p "			{BEGIN(theory);}
+<*>^"translation"	{BEGIN(trans); return ET::TRANSHEADER;}
+<*>^"=== atom translation ==="	{BEGIN(trans2); return ET::TRANSHEADER2;}
+<*>^"=== ==="	{BEGIN(theory);}
+
+<theory,INITIAL>^"c\n"	{/* disregard comments */}
+<theory,INITIAL>^"c ".*	{/* disregard comments */}
+
+<theory>"cnf"	{return ET::CNF;}
+<theory>"ecnf"	{return ET::ECNF;}
+<theory>"def" 	{return ET::DEFPRESENT;}
+<theory>"aggr" 	{return ET::AGGPRESENT;}
+
+<theory>^"WSet"	{return ET::WSETDEFN;}
+<theory>^"Set"	{return ET::SETDEFN;}
+<theory>"Card"	{ecnflval->aggr = AggType::CARD; return ET::AGGDEFN;}
+<theory>"Sum"	{ecnflval->aggr = AggType::SUM; return ET::AGGDEFN;}
+<theory>"Prod"	{ecnflval->aggr = AggType::PROD; return ET::AGGDEFN;}
+<theory>"Min"	{ecnflval->aggr = AggType::MIN; return ET::AGGDEFN;}
+<theory>"Max"	{ecnflval->aggr = AggType::MAX; return ET::AGGDEFN;}
+
+<theory>^"Level" { return ET::LEVEL; }
+
+<theory>"<-"	{return ET::DEFOP;}
+
+<theory>"D"		{ecnflval->sem = AggSem::DEF;  return ET::SEMDEFN;}
+<theory>"C"		{ecnflval->sem = AggSem::COMP;  return ET::SEMDEFN;}
+
+<theory>"O"		{/*ecnflval*/ return ET::ORSEM;}
+
+<theory>"L"		{ecnflval->sign = AggSign::UB;  return ET::SIGNDEFN;}
+<theory>"G"		{ecnflval->sign = AggSign::LB; return ET::SIGNDEFN;}
+
+<theory>^"Mnmsubset"	{return ET::SUBSETMINDEFN;}
+<theory>^"Mnmvar"		{return ET::VARMINDEFN;}
+<theory>^"Mxmvar"		{return ET::VARMAXDEFN;}
+<theory>^"Mnmagg"		{return ET::AGGMINDEFN;}
+
+<theory>" "		{/* disregard whitespaces */}
+<theory>"\t"	{/*                       */}
+<theory>"\n"	{}
+
+<theory>"|"		{return ET::DELIM;}
+
+<theory>^"Implication"	{return ET::IMPLICATION;}
+<theory>^"PARTIAL"		{return ET::PARTIAL;}
+<theory>"INTVAR"		{return ET::INTVAR;}
+<theory>"INTVARDOM" 	{return ET::INTVARDOM;}
+<theory>^"BINTRI"		{return ET::BINTRI;}
+<theory>^"BINTRT"		{return ET::BINTRT;}
+<theory>^"DISTINCT"		{return ET::DISTINCT;}
+<theory>^"CPSUM"		{return ET::CPSUM;}
+<theory>^"CPPROD"		{return ET::CPPROD;}
+
+<theory>^"SubTheory"		{return ET::SUBTHEORY;}
+
+<theory>"="		{ecnflval->rel = EqType::EQ; return ET::REL;}
+<theory>">"		{ecnflval->rel = EqType::G; return ET::REL;}
+<theory>"<"		{ecnflval->rel = EqType::L; return ET::REL;}
+<theory>"~="	{ecnflval->rel = EqType::NEQ; return ET::REL;}
+<theory>"=<"	{ecnflval->rel = EqType::LEQ; return ET::REL;}
+<theory>">="	{ecnflval->rel = EqType::GEQ; return ET::REL;}
+
+<theory>"=>"	{ecnflval->impl = ImplicationType::IMPLIES; return ET::IMPL;}
+<theory>"<=>"	{ecnflval->impl = ImplicationType::EQUIVALENT; return ET::IMPL;}
+
+<theory>^"e"	{ecnflval->boolean = true; return ET::QUANTe;} //existential quantifier
+<theory>^"a"	{ecnflval->boolean = false; return ET::QUANTe;} //universal quantifier
+
+ /* Longest match is returned -> if e.g. "20", NUMBER is returned. 
+    If "0", then ZERO is returned since it's the first matching rule.
+  */
+<theory>"0"			{ecnflval->integer = 0; return ET::ZERO;}
+<theory>-?[0-9]+	{ecnflval->str = new string(yytext); return ET::NUMBER;}
+			  
+<trans>^"type"			{ return ET::TYPE;				}
+<trans>^"show pred"		{ return ET::SHOWPRED;			}
+<trans>^"pred"			{ return ET::PRED;				}
+<trans>^"show func"		{ return ET::SHOWFUNC;			}
+<trans>^"func"			{ return ET::FUNC;				}
+<trans>^"true"			{ return ET::TRUE;				}
+<trans>^"arbitrary"		{ return ET::ARBIT;				}
+<trans>{ATOMSTRING}		{ ecnflval->str = new string(yytext);	return ET::T_ID;	}
+<trans>{INT}			{ ecnflval->integer = atoi(yytext); 	return ET::T_NUM;	}
+<trans>{WHITESPACE}   	{                      		}
+<trans>"|"				{return ET::DELIM;}
+<trans>.				{ return *yytext;			}
+
+<trans2>{ATOM2STRING}		{ ecnflval->str = new string(yytext);	return ET::T_ID2;	}
+<trans2>{INT}			{ ecnflval->integer = atoi(yytext); 	return ET::T_NUM;	}
+<trans2>{WHITESPACE}   	{                      		}
+<trans2>"|"				{return ET::DELIM;}
+<trans2>.				{ return *yytext;			}
+
+<theory,INITIAL,trans>\n {} //IMPORTANT: lex . pattern does NOT match newlines, so match them explicitly!
+<theory,INITIAL>.	{/* Anything else: parse error */
+						char s[100];
+						sprintf(s, "Encountered unexpected character '%s'.\n", yytext);
+						throw idpexception(s);
+					}

@@ -1,0 +1,16 @@
+vocabulary V{
+	type x isa int
+	p(x)
+}
+
+theory T:V{
+	prod{x: p(x): x}=-2.
+}
+
+structure S:V{
+	x = {-1..2}
+}
+
+procedure getExpectedNbOfModels(){
+	return 2
+}

@@ -1,0 +1,23 @@
+/*****************************************************************************
+ * Copyright 2010-2012 Katholieke Universiteit Leuven
+ *
+ * Use of this software is governed by the GNU LGPLv3.0 license
+ *
+ * Written by Broes De Cat, Bart Bogaerts, Stef De Pooter, Johan Wittocx,
+ * Jo Devriendt, Joachim Jansen and Pieter Van Hertum 
+ * K.U.Leuven, Departement Computerwetenschappen,
+ * Celestijnenlaan 200A, B-3001 Leuven, Belgium
+ ****************************************************************************/
+
+#include "UnnestDomainTerms.hpp"
+
+bool UnnestDomainTerms::wouldMove(Term* t) {
+	return t->type() == TermType::DOM;
+}
+
+Formula* UnnestDomainTermsFromNonBuiltins::visit(PredForm* pf){
+	if( pf->symbol()->builtin()){
+		return pf;
+	}
+	return UnnestDomainTerms::visit(pf);
+}

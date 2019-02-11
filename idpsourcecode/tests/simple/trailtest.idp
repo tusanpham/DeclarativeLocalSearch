@@ -1,0 +1,30 @@
+include <mx>
+include <table_utils>
+
+vocabulary V{
+	P
+	Q
+}
+
+theory T:V{
+	P | Q.
+}
+
+structure S:V{
+	
+}
+
+procedure main() {
+	stdoptions.trace = true
+	solution, trace = allmodels(T,S)
+	print(tabletostring(trace))
+	if (#trace>5 and #trace<20 and
+		trace[1]["type"]=="assign" and 
+		trace[1]["dl"]==0) then
+			
+		return 1
+	else 
+	return 0
+	end
+}
+

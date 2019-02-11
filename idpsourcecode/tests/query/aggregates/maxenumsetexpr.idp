@@ -1,0 +1,19 @@
+vocabulary V{
+	type x isa int
+	p(x)
+	q(x)
+}
+
+query Q : V {
+	{x: max(3,max{:?y: p(y):2},max{:q(x):4})=3}
+}
+
+structure S:V{
+	x = {0..1}
+	q = {1}
+	p = {0}
+}
+
+procedure getExpectedSet(){
+  return {{0}}
+}

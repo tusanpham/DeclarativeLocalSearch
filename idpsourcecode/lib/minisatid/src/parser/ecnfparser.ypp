@@ -1,0 +1,758 @@
+/*
+ * Copyright 2011 Katholieke Universiteit Leuven
+ *
+ * Use of this software is governed by the GNU LGPLv3.0 license
+ *
+ * Written by Broes De Cat, K.U.Leuven, Departement
+ * Computerwetenschappen, Celestijnenlaan 200A, B-3001 Leuven, Belgium
+ */
+%require "2.4.1"
+%skeleton "lalr1.cc"
+%defines
+//%debug
+%locations
+%error-verbose
+%name-prefix="ecnf"
+%define namespace "MinisatID"
+%define parser_class_name "ECNFParser"
+%parse-param { MinisatID::ECNFScanner &scanner }
+%parse-param { MinisatID::ExternalConstraintVisitor* wrapper }
+%parse-param { TheoryID theoryid }
+%parse-param { bool negatemod }
+%parse-param { int maxatom }
+%parse-param { std::vector<Lit> rigidlits }
+%lex-param   { MinisatID::ECNFScanner &scanner }
+
+%code requires{
+	#include <iostream>
+	#include <stdio.h>
+	#include <cstring>
+	#include <string>
+	#include <vector>
+	#include <list>
+	#include <map>
+	
+	#include "external/ExternalUtils.hpp"
+	#include "external/Translator.hpp"
+	#include "utils/Print.hpp"
+	#include "external/Constraints.hpp"
+	#include "theorysolvers/PCSolver.hpp"
+	
+	#include <limits>
+	
+	using namespace MinisatID;
+	using namespace std;
+	
+	typedef numeric_limits<int> intlim;
+	
+	typedef ExternalConstraintVisitor* pwls;
+	
+	// Forward-declare the Scanner class; the Parser needs to be assigned a 
+	// Scanner, but the Scanner can't be declared without the Parser
+	namespace MinisatID {
+		class ECNFScanner;
+	}
+}
+
+%code{
+	// Prototype for the yylex function
+	static int ecnflex(MinisatID::ECNFParser::semantic_type * yylval, MinisatID::ECNFParser::location_type * yyloc, MinisatID::ECNFScanner &scanner);
+		
+	// TODO External state (to be removed in future)
+	FODOTTranslator*	fodottrans = NULL;
+	LParseTranslator*	simpletrans = NULL;
+	
+	template<class Wrapper>
+	void readCNFModalHierLevel(Wrapper* wrapper, bool existential, const vector<Lit>& rigidlits, TheoryID& level, bool& negatemod, int& maxatom);
+	
+	/**
+	 * CR-CheckResult: checks the result of passing some data to the solvers.
+	 * The result is false if unsat was already detected.
+	 */
+	template<class Wrapper, class T>
+	void CR(Wrapper* wrapper, T& formula, TheoryID level);
+	
+	MinisatID::Atom cAtom(string* c);
+	MinisatID::Lit cLiteral(string* c);
+	MinisatID::Weight cWeight(string* s);
+	uint cID(string* c);
+	VarID cVarID(string* c);
+	
+	// Convert integer to string
+	std::string itos(int n) {
+	   if(n == 0) return "0";
+	   std::string s;
+		int a = abs(n);
+	   while(a > 0) {
+	      int temp = a % 10;
+	      char c = '0' + temp;
+	      s = c + s;
+	      a = (a - temp) / 10;
+	   }
+		if(n < 0) return ('-' + s);
+	   else return s;
+	}
+	
+	// Parsing
+	
+	void addTuple(int literalnumber, const string& atom);
+	void parsetruelist(std::vector<int>* vi);
+	void parsearbitlist(std::vector<int>* vi);
+	void parsetype(std::string* name, std::vector<std::string>* inter);
+	void parsepred(std::string* name, int num, std::vector<std::string>* ptypes, bool f);
+	
+	int defaultdefID = 1;
+	enum ECNF_VERSION {VERSION_NONE, VERSION_OLD, VERSION_NEW}; 
+	ECNF_VERSION currentreadversion = VERSION_NONE;
+	
+	void checkVersion(ECNF_VERSION version);
+}
+
+%union {
+	int integer;
+	bool boolean;
+	const char* cstr;
+	std::string* str;
+    std::vector<int>* vints;
+    std::vector<MinisatID::Weight>* vweights;
+    std::vector<MinisatID::VarID>* varids;
+    std::vector<MinisatID::Lit>* vlits;
+    std::vector<MinisatID::WLtuple>* vlws;
+    MinisatID::EqType rel;
+    MinisatID::ImplicationType impl;
+    MinisatID::AggType aggr;
+    MinisatID::AggSign sign;
+    MinisatID::AggSem sem;
+	std::vector<std::string>*	vstr;
+	MinisatID::VarID varid;
+}
+
+%token DEFOP
+%token SUBSETMINDEFN VARMINDEFN VARMAXDEFN AGGMINDEFN
+%token SETDEFN WSETDEFN  
+%token <integer> ZERO
+%token <str> NUMBER
+%token <sem> SEMDEFN
+%token <sign> SIGNDEFN 
+%token <rel> REL
+%token <impl> IMPL
+%token <aggr> AGGDEFN
+%token CNF ECNF DEFPRESENT AGGPRESENT MINIMPRESENT
+%token ORSEM
+%token INTVAR INTVARDOM PARTIAL 
+%token CPSUM CPPROD ELEMENT COUNT DISTINCT DELIM BINTRI BINTRT IMPLICATION LEVEL
+%token SUBTHEORY
+
+%token <boolean> QUANTe
+%type <integer> number
+%type <str> weight
+%type <vweights> weightbody
+%type <varid> varid
+%type <varids> varidbody
+%type <varids> possiblyemptyvaridbody
+%type <varids> emptyvaridbody
+%type <vlits> body
+%type <vlws> wbody
+
+//Translation
+%token TRANSHEADER TRANSHEADER2
+%token TYPE
+%token PRED
+%token FUNC
+%token SHOWPRED
+%token SHOWFUNC
+%token TRUE
+%token ARBIT
+
+/** Other Terminals **/
+%token <str> T_ID T_ID2
+%token <integer> T_NUM
+
+/** Non-terminals with semantic value **/
+%type <str>	identifier identifier2
+%type <vints>	numlist
+%type <vstr>	uint
+%type <vstr>	idnlist
+
+//Blijkt nog niet te werken, zal ook wel in een nieuwere versie zijn
+//%destructor { delete $$; report("DELETED.\n"); } wbody ibody body
+
+%start init
+
+%%
+
+/*
+ * Decides whether to use CNF or ECNF
+ */
+init	:	CNF	number number cnftheory
+		|   CNF number number { maxatom = $2; } modalcnf {
+				if(negatemod){
+					readCNFModalHierLevel(wrapper, true, rigidlits, theoryid, negatemod, maxatom);
+				}
+				theoryid = TheoryID(theoryid.id-1);
+			}	cnftheory
+		|	ECNF header ecnftheory translation
+		;
+
+header	: 	/*empty*/
+		| 	header DEFPRESENT // Backwards compatibility
+		| 	header AGGPRESENT // Backwards compatibility
+		| 	header MINIMPRESENT // Backwards compatibility
+		;
+		
+// CNF THEORY
+		
+cnftheory:	/*empty*/
+		| 	cnftheory cnfclause
+		;
+			
+cnfclause: 	body ZERO	
+				{	
+					Disjunction clause(*$1);
+					CR(wrapper, clause, theoryid);
+					delete $1;
+				}
+		;
+		
+
+// TODO assumption that always starts with "e"
+modalcnf	
+		:	QUANTe   
+				{ 	readCNFModalHierLevel(wrapper, $1, rigidlits, theoryid, negatemod, maxatom); }
+			body { rigidlits.insert(rigidlits.end(), (*$3).cbegin(), (*$3).cend()); delete($3); } ZERO // NOTE: FIRST has to add new level with PREVIOUS rigid atoms before adding to them
+		|	modalcnf QUANTe   
+				{ 	readCNFModalHierLevel(wrapper, $2, rigidlits, theoryid, negatemod, maxatom); }
+			body { rigidlits.insert(rigidlits.end(), (*$4).cbegin(), (*$4).cend()); delete($4); } ZERO // NOTE: FIRST has to add new level with PREVIOUS rigid atoms before adding to them
+		;
+			
+//---------------------------------------------		
+// ECNF THEORY	
+//---------------------------------------------
+
+ecnftheory	:	/* empty */
+			|	ecnftheory clause
+			|	ecnftheory rule
+			|	ecnftheory implication
+			| 	ecnftheory agg
+			|	ecnftheory set
+			|	ecnftheory wset
+			|	ecnftheory subsetmnmz
+			|	ecnftheory varmnmz
+			|	ecnftheory varmxmz
+			|	ecnftheory summnmz
+			|	ecnftheory aggmnmz
+			|	ecnftheory intvar
+			|	ecnftheory cpconstraint
+			|	ecnftheory level
+			| 	ecnftheory subtheory
+			;
+			
+level		: LEVEL number ZERO {
+					MAssert($2>0); 
+					theoryid = TheoryID((uint)$2); 
+				}
+				
+				// childid head rigidatoms
+subtheory :	SUBTHEORY number NUMBER body ZERO 
+			{	
+				std::vector<Atom> atoms;
+				for(auto lit:*$4){
+					atoms.push_back(lit.getAtom());
+				}
+				SubTheory sub(cAtom($3), TheoryID((uint)$2), atoms);
+				CR(wrapper, sub, theoryid);
+				delete $4;
+			}
+		;
+
+subsetmnmz: SUBSETMINDEFN body ZERO
+			{
+				MinimizeSubset mnm(1, *$2);
+				CR(wrapper, mnm, theoryid);
+				delete $2; 
+			}
+varmnmz :	VARMINDEFN NUMBER ZERO
+			{ 
+				OptimizeVar mnm(1, cVarID($2), true);
+				CR(wrapper, mnm, theoryid);
+			}
+
+varmxmz :	VARMAXDEFN NUMBER ZERO
+			{ 
+				OptimizeVar mnm(1, cVarID($2), false);
+				CR(wrapper, mnm, theoryid);
+			}
+			
+aggmnmz :	AGGMINDEFN AGGDEFN NUMBER ZERO 	
+			{
+				MinimizeAgg mnm(1, cID($3), $2);
+				CR(wrapper, mnm, theoryid);
+				delete $3;
+			}
+
+// NOTE: only for compatibility (has redundant head atom)
+summnmz :	AGGMINDEFN AGGDEFN NUMBER NUMBER ZERO 	
+			{
+				MinimizeAgg mnm(1, cID($4), $2);
+				CR(wrapper, mnm, theoryid);
+				delete $3; delete $4;
+			}
+		
+clause	:	body ZERO	
+			{
+				Disjunction clause(*$1);
+				CR(wrapper, clause, theoryid);
+				delete $1;
+			}
+		;
+
+rule	:	SEMDEFN NUMBER body ZERO
+			{ 	
+				checkVersion(VERSION_OLD);
+				if($1==AggSem::OR){
+					error(@1, "Incorrect rule type specification \"O\", should be either \"D\" or \"C\".");
+				}
+				Rule rule(cAtom($2), *$3, $1==AggSem::COMP, defaultdefID, false); //AggSem is bit of a hack, to be fixed
+				delete $2; delete $3;
+				CR(wrapper, rule, theoryid);
+			}
+		;
+
+rule	:	SEMDEFN NUMBER DELIM NUMBER DEFOP body ZERO
+			{ 	
+				checkVersion(VERSION_NEW);
+				if($1==AggSem::OR){
+					error(@1, "Incorrect rule type specification \"O\", should be either \"D\" or \"C\".");
+				}
+				Rule rule(cAtom($4), *$6, $1==AggSem::COMP, cID($2), false);//AggSem is bit of a hack, to be fixed
+				delete $2; delete $4; delete $6;
+				CR(wrapper, rule, theoryid);
+			}
+		;
+		
+implication: IMPLICATION SEMDEFN NUMBER IMPL body ZERO
+			{ 	
+				Implication implic(cLiteral($3), $4, *$5, $2==AggSem::COMP);
+				delete $3; delete $5;
+				CR(wrapper, implic, theoryid);
+			}
+		;
+
+agg		:	AGGDEFN SEMDEFN SIGNDEFN NUMBER NUMBER weight ZERO	
+			{	
+				if($2 == AggSem::DEF){
+					checkVersion(VERSION_OLD);
+				}
+	
+				Aggregate agg(cLiteral($4), cID($5), cWeight($6), $1, $3, $2, defaultdefID, false);
+				CR(wrapper, agg, theoryid);
+				delete $4; delete $5; delete $6;
+			}
+		|	AGGDEFN ORSEM SIGNDEFN NUMBER NUMBER weight ZERO	
+			{	
+				Aggregate agg(cLiteral($4), cID($5), cWeight($6), $1, $3, AggSem::OR, defaultdefID, false);
+				CR(wrapper, agg, theoryid);
+				delete $4; delete $5; delete $6;
+			}
+		|	AGGDEFN DEFOP NUMBER SIGNDEFN NUMBER NUMBER weight ZERO	
+			{	
+				checkVersion(VERSION_NEW);
+
+				Aggregate agg(mkPosLit(cAtom($5)), cID($6), cWeight($7), $1, $4, AggSem::DEF, cID($3), false);
+				CR(wrapper, agg, theoryid);
+				delete $5; delete $6; delete $7;
+			}
+		;
+
+set		:	SETDEFN NUMBER body ZERO	
+			{ 	
+				auto set = createSet(cID($2), *$3, 1);
+				CR(wrapper, set, theoryid);
+				delete $2; delete $3;
+			}
+		;
+
+wset	:	WSETDEFN NUMBER	wbody ZERO	
+			{	
+				WLSet set(cID($2), *$3);
+				delete $2; delete $3;
+				CR(wrapper, set, theoryid);
+			}
+		;		
+		
+// ECNF CONSTRAINT SUPPORT
+
+intvar	:	INTVAR varid weight weight ZERO 
+			{
+				IntVarRange var($2, cWeight($3), cWeight($4));
+				CR(wrapper, var, theoryid);
+				delete $3; delete $4;
+			}
+		|	INTVARDOM varid weightbody DELIM ZERO 
+			{
+				IntVarEnum var($2, *$3);
+				CR(wrapper, var, theoryid);
+				delete $3;
+			}
+		|	PARTIAL INTVAR varid NUMBER weight weight ZERO 
+			{
+				IntVarRange var($3, cWeight($5), cWeight($6), cLiteral($4));
+				CR(wrapper, var, theoryid);
+				delete $4; delete $5;
+			}
+		|	PARTIAL INTVARDOM varid NUMBER weightbody DELIM ZERO 
+			{
+				IntVarEnum var($3, *$5, cLiteral($4));
+				CR(wrapper, var, theoryid);
+				delete $4;
+			}
+		;
+
+//intvarset
+//		:	INTVARSET number ibody ZERO 
+//				{ 	CR(wrapper, wrapper->addIntVarSet($2, *$3), theoryid); delete $3; }
+//		;
+
+//abbreviations: T = intterm, I = intconst, R = relational operator, ST = set of T, SI = set of I
+
+cpconstraint
+		:	BINTRI NUMBER varid REL weight ZERO 
+			{ 	
+				CPBinaryRel binrel(mkPosLit(cAtom($2)), $3, $4, cWeight($5));
+				CR(wrapper, binrel, theoryid);
+				delete $2; delete $5;
+			}
+		|	BINTRT NUMBER varid REL varid ZERO 
+			{ 	
+				CPBinaryRelVar binrel(mkPosLit(cAtom($2)), $3, $4, $5);
+				CR(wrapper, binrel, theoryid);
+				delete $2;
+			}
+		|	CPSUM NUMBER body DELIM possiblyemptyvaridbody DELIM weightbody REL weight ZERO   
+			{ 	
+				CPSumWeighted sum(mkPosLit(cAtom($2)), *$3, *$5, *$7, $8, cWeight($9));
+				CR(wrapper, sum, theoryid);
+				delete $2; delete $3; delete $5; delete $7; delete $9;
+			}
+		|	CPPROD NUMBER body DELIM possiblyemptyvaridbody DELIM weight REL varid ZERO   
+			{ 	
+				CPProdWeighted prod(mkPosLit(cAtom($2)), *$3, *$5, cWeight($7), $8, $9);
+				CR(wrapper, prod, theoryid);
+				delete $2; delete $3; delete $5; delete $7;
+			}
+			//only global alldiff at the moment!
+		|	DISTINCT varidbody DELIM ZERO //DELIM to remove shift-reduce conflict 
+			{ 	
+				CPAllDiff alldiff(*$2);
+				CR(wrapper, alldiff, theoryid);
+				delete $2;
+			}
+		;
+
+// TRANSLATION
+
+translation	: /* empty */
+			|	TRANSHEADER 
+				{
+					fodottrans = new FODOTTranslator(wrapper->getOptions().transformat==OutputFormat::ASP);	
+					wrapper->setTranslator(fodottrans);
+				} 
+				typelist predlist funclist truelist arbitlist
+				
+			| 	TRANSHEADER2 
+				{	
+					simpletrans = new LParseTranslator();
+					wrapper->setTranslator(simpletrans);
+				}
+				tuplelist
+			;
+			
+typelist	: /* empty */
+			| typelist type
+			;
+			
+type		: TYPE identifier ':' idnlist	{ parsetype($2,$4); delete($2); delete($4);	}
+			;
+
+predlist	: /* empty */
+			| predlist pred
+			;
+
+pred		: SHOWPRED T_NUM identifier ':' uint	{ parsepred($3,$2,$5,false); delete($3); delete($5);	}
+			| PRED T_NUM identifier ':' uint		{ delete($3); delete($5);								}
+			;
+
+funclist	: /* empty */
+			| funclist func
+			;
+
+func		: SHOWFUNC T_NUM identifier ':' uint	{ parsepred($3,$2,$5,true); delete($3); delete($5); 	}
+			| FUNC T_NUM identifier ':' uint { delete($3); delete($5); }
+			;
+
+truelist	: TRUE ':' numlist	{ parsetruelist($3); delete($3); }
+			;
+
+arbitlist	: ARBIT ':' numlist	{ parsearbitlist($3); delete($3); }
+			;
+
+idnlist		: idnlist identifier	{ $1->push_back(*$2); $$ = $1; delete($2); }
+			| idnlist T_NUM			{ $1->push_back(itos($2)); $$ = $1; }
+			| identifier			{ $$ = new vector<string>(1,(*$1)); delete($1);	}
+			| T_NUM					{ $$ = new vector<string>(1,itos($1)); }
+			;
+
+uint		: /* empty */		{ $$ = new vector<string>(0); }
+			| uint identifier	{ $1->push_back(*$2); $$ = $1; delete($2); }
+			;
+
+numlist		: /* empty */		{ $$ = new vector<int>(0); }
+			| numlist T_NUM		{ $1->push_back($2); $$ = $1; }
+			| numlist identifier '/' T_NUM		{ $$ = $1; }
+			| numlist identifier '/' T_NUM ':' { $$ = $1; }
+			;
+			
+tuplelist	: /* empty */ 
+			| tuplelist T_NUM DELIM identifier2 { addTuple($2, *$4); delete($4); }
+			;
+
+identifier	: T_ID	{ $$ = $1;	}
+			;
+
+identifier2	: T_ID2	{ $$ = $1;	}
+			;		
+
+//---------------------------------------------		
+// GENERAL RULES
+//---------------------------------------------
+			
+//Clauses can be empty!
+body	:	body NUMBER { $$ = $1; $$->push_back(cLiteral($2));	delete($2); }
+		|				{ $$ = new std::vector<MinisatID::Lit>();	}
+		;
+		
+wbody	:	wbody NUMBER REL 
+			{ 
+				if($3!=MinisatID::EqType::EQ) { 
+					throw MinisatID::idpexception("Weighted sets can only contain tuples with equality.\n");
+				} 
+			} 
+			weight	
+			{ $$ = $1; $$->push_back(MinisatID::WLtuple(cLiteral($2), cWeight($5))); delete($2);  delete $5;}
+			
+		|	NUMBER REL 
+			{ 
+				if($2!=MinisatID::EqType::EQ) { 
+					throw MinisatID::idpexception("Weighted sets can only contain tuples with equality.\n");
+				}
+			}
+			weight	
+			{ $$ = new std::vector<WLtuple>(1,MinisatID::WLtuple(cLiteral($1), cWeight($4))); delete($1); delete $4;}
+		;
+		
+weightbody 	
+		: 	weightbody weight	{ $$ = $1; $$->push_back(cWeight($2)); delete $2; }
+		| 	weight			{ $$ = new vector<Weight>(1, cWeight($1)); delete $1;	}
+		;
+		
+possiblyemptyvaridbody 	:  varidbody { $$=$1;}
+						| emptyvaridbody { $$ = $1;}
+						;
+						
+varidbody 	: 	varidbody varid	{ $$ = $1; $$->push_back($2);	}
+		| 	varid  		{ $$ = new vector<VarID>(1, $1);	}
+		;
+		
+emptyvaridbody	:	{ $$ = new vector<VarID>(0);};
+		
+varid	:   	number	{ 
+				if($1<0){
+					throw MinisatID::idpexception("Variable IDs cannot be negative.\n");
+				}
+				$$ = {(uint)$1};
+			}
+		
+number	:	NUMBER	{ $$ = atoi((*$1).c_str()); delete($1); }
+		|	ZERO	{ $$ = 0; }
+		
+weight	:	NUMBER	{ $$ = $1; }
+		|	ZERO	{ $$ = new string("0"); }
+
+%%
+
+int ecnfwrap() {
+	clog << "End of file reached before it was expected... bailing out.\n";
+	return 1;
+}
+
+void checkVersion(ECNF_VERSION version){
+	if(currentreadversion == VERSION_NONE){
+		currentreadversion = version;
+	}
+	if(currentreadversion != version){
+		throw idpexception("Cannot combine previous ecnf format with the new one "
+				"(using rules/aggregates with and without definition id).\n");
+	}
+}
+
+Atom cAtom(string* c){
+	int i = atoi(c->c_str());
+	if(i<0){
+		throw idpexception("Negative number supplied where an atom was suspected.\n");
+	}
+	return Atom(i);
+}
+
+uint cID(string* c){
+	int i = atoi(c->c_str());
+	if(i<1){
+		throw idpexception("IDs have to be non-negative nonzero integers.\n");
+	}
+	return i;
+}
+VarID cVarID(string* c){
+	return {cID(c)};
+}
+
+Lit cLiteral(string* c){
+	int i = atoi(c->c_str());
+	return mkLit(abs(i), i<0);
+}
+
+Weight cWeight(string* s){
+	const char* c = s->c_str();
+	Weight w(0);
+	bool begin = true, negate = false;
+	for(int i = 0; c[i] != '\0'; ++i) {
+	    if(begin && c[i]=='-'){
+	    	negate = true;
+	    	begin = false;
+	    	continue;
+	    }
+#ifdef NOARBITPREC
+		if(posInfinity()/10 < w){
+			throw idpexception("Weight exceeds the maximum supported value. Consider using GMP.\n");
+		}
+#endif
+	    w = w*10 + (c[i]-48);
+	}
+	if(negate){
+		w *= -1;
+	}
+	return w;
+}
+
+/**
+ * CR-CheckResult: checks the result of passing some data to the solvers.
+ * The result is false if unsat was already detected.
+ */
+template<class Wrapper, class T>
+void CR(Wrapper* wrapper, T& formula, TheoryID level){
+	formula.theoryid = level;
+	extAdd(*wrapper, formula);
+	if(wrapper->isCertainlyUnsat()){
+		throw idpexception("Unsat during parsing.\n");
+	}
+}
+
+void addTuple(int literalnumber, const string& atom) {
+	if(simpletrans!=NULL){
+		simpletrans->setString(Atom(literalnumber), atom);
+	}
+}
+
+void parsetruelist(vector<int>* literalnumbers) {
+	if(fodottrans!=NULL){
+		fodottrans->setTruelist(*literalnumbers);
+	}
+}
+
+void parsearbitlist(vector<int>* literalnumbers) {
+	if(fodottrans!=NULL){
+		fodottrans->setArbitlist(*literalnumbers);
+	}
+}
+
+void parsetype(string* name, vector<string>* inter) {
+	if(fodottrans!=NULL){
+		fodottrans->addType(*name, *inter);
+	}
+}
+
+void parsepred(string* name, int startingnumber, vector<string>* argtypes, bool isfunction) {
+	if(fodottrans!=NULL){
+		fodottrans->addPred(*name, startingnumber, *argtypes, isfunction);
+	}
+}
+
+template<class Wrapper>
+void readCNFModalHierLevel(Wrapper* wrapper, bool existential, const vector<Lit>& rigidlits, TheoryID& level, bool& negatemod, int& maxatom){
+	bool writeexists;
+	if(existential && negatemod){
+		negatemod = false;
+		writeexists = false;
+	}else if(existential && !negatemod){
+		negatemod = false;
+		writeexists = true;
+	}else if(!existential && negatemod){
+		negatemod = true;
+		writeexists = true;
+	}else{
+		negatemod = true;
+		writeexists = false;
+	}
+		
+	if(level.id==1){
+		if(not existential){
+			throw idpexception("First QBF level cannot be universal.\n");
+		}
+		level = TheoryID(level.id+1);		
+		return;
+	}
+	if(level.id==2){
+		auto trans = new QBFTranslator();
+		wrapper->setTranslator(trans);
+		for(auto lit:rigidlits){
+			stringstream ss;
+			ss <<lit.getAtom();
+			trans->setString(lit.getAtom(), ss.str());
+		}
+	}
+	
+	auto lastlevel = TheoryID(level.id-1);
+	
+	if(rigidlits.size()==0){
+		throw idpexception("List of rigid atoms is empty.\n");
+	}	
+	
+	auto head = ++maxatom;
+	if(writeexists){
+		Disjunction disj({mkPosLit(head)});
+		CR(wrapper, disj, lastlevel);
+		head = ~head;
+	}else{
+		Disjunction disj({mkNegLit(head)});
+		CR(wrapper, disj, lastlevel);
+	}
+	std::vector<Atom> atoms;
+	for(auto lit:rigidlits){
+		atoms.push_back(lit.getAtom());
+	}
+	SubTheory sub(head, level, atoms);
+	CR(wrapper, sub, lastlevel);
+	level = TheoryID(level.id+1);
+}
+
+// We have to implement the error function
+void MinisatID::ECNFParser::error(const MinisatID::ECNFParser::location_type&, const std::string &msg) {
+	std::stringstream ss;
+	ss << "Error: " << msg << std::endl;
+	throw idpexception(ss.str());
+}
+
+// Now that we have the Parser declared, we can declare the Scanner and implement
+// the yylex function
+#include "parser/ECNFScanner.hpp"
+static int ecnflex(MinisatID::ECNFParser::semantic_type * yylval, MinisatID::ECNFParser::location_type * yyloc, MinisatID::ECNFScanner &scanner) {
+	return scanner.ecnflex(yylval, yyloc);
+}

@@ -1,0 +1,241 @@
+procedure main(){ 
+    setOptions()
+    stdoptions.localsearchtype = "firstimprove,2opt"
+    //stdoptions.localsearchtype = "LNS,lns2"
+    //stdoptions.localsearchtype ="firstimprove,oropt1;bestimprove,2opt;tabu,oropt2"
+    
+    //sol=modelexpand(Tproblem, S)[1]
+    //sol = minimize(T, S, Obj)[1]
+    
+    sol = localsearch(T,S)[1]				//lns1;lns2;	oropt1;oropt2;2opt;
+    
+    print('cost: ', query(ObjValue, sol))
+    //print(sol)
+}
+
+procedure setOptions(){
+    stdoptions.timeout_localsearch=60
+    stdoptions.verbosity.localsearch=1
+    stdoptions.verbosity.solving=0
+    stdoptions.verbosity.grounding=0
+    stdoptions.verbosity.calculatedefinitions=0
+	stdoptions.postprocessdefs=true
+    stdoptions.timeout=6000
+    stdoptions.mxtimeout=600
+    stdoptions.xsb=true
+    stdoptions.cpsupport=true
+}
+
+
+
+/**
+* TSP
+*/
+
+
+vocabulary V{
+    type N isa nat
+    type City
+    dec_Path(City,City)
+    Distance(City,City):N
+    Reachable(City)
+    Reach(City, City)
+    longestEdge:N
+}
+
+theory T:V{
+    !x: ?1y: dec_Path(x,y).
+    !x: ?1y: dec_Path(y,x).
+    !x: ~dec_Path(x,x).
+    !x: Reachable(x).
+    {
+        Reachable(MIN[:City]).
+        Reachable(x) <- ?y: Reachable(y) & dec_Path(y,x).
+    }
+    {
+        !x: Reach(x,x) <- true.
+        !x, y: Reach(x,y) <- dec_Path(x,y) & y ~= MIN[:City].
+        !x, y: Reach(x,y) <- ?z: dec_Path(x,z) & Reach(z,y) & z ~= MIN[:City].
+    }
+    {
+        longestEdge = le <- !a, b: Distance(a, b) =< le.
+    }
+}
+
+term Obj:V{
+    sum{x y : dec_Path(x,y) : Distance(x,y)}
+}
+query ObjValue:V{
+    {o : sum{x y : dec_Path(x,y) : Distance(x,y)}=o}
+}
+
+structure Simple:V{
+        Distance = {A, A, 0; A, B, 10; A, C, 15; A, D, 8; A,E,1; A, F, 3; A, G, 5;
+    			B, A, 10; B, B, 0; B, C, 9; B, D, 7; B, E,19; B, F, 3; B, G, 1;
+    			C, A, 6; C, B, 9; C, C, 0; C, D, 10; C, E, 10; C, F, 2; C, G, 3;
+    			D, A, 9; D, B, 7; D, C, 10; D, D, 0; D, E, 12; D, F, 6; D, G, 6;
+    			E, A, 1; E, B, 2; E, C, 10; E, D, 12; E, E, 0; E, F, 8; E, G, 2;
+    			F, A, 1; F, B, 3; F, C, 8; F, D, 6; F, E, 9; F, F, 0; F, G, 9;
+    			G, A, 5; G, B, 2; G, C, 12; G, D, 7; G, E, 3; G, F, 8; G, G, 0;}
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~simple neighbourhood moves~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// 2-opt modelling
+vocabulary Vmove_2opt{
+    extern type V::City
+    A: City
+    B: City
+    C: City
+    D: City
+}
+
+vocabulary Vmoves_2opt{
+    extern vocabulary V
+    possiblemove(City, City, City, City)
+}
+
+vocabulary Vnext_2opt{
+    extern vocabulary V
+    extern vocabulary Vmove_2opt
+    next_dec_Path(City,City)
+}
+
+
+// for a280 instance: 16 seconds to getmove with distance constraints
+// 0.08 seconds to getmove without distance constraints, but it doesn't work for large instance of course
+query getValidMoves_2opt:V{
+    {a b c d: dec_Path(a,b) & dec_Path(c,d) & b ~= c & a ~= c & Reach(b,c) & b ~= MIN[:City] 
+       & 			(Distance(a,c) + Distance(b,d) - Distance(a,b) - Distance(c,d)<0)
+    }	
+}
+
+query getDeltaObj_2opt:Vnext_2opt{
+    {delObj :  delObj = Distance(A,C) + Distance(B,D) - Distance(A,B) - Distance(C,D)}
+}
+
+
+theory Tnext_2opt: Vnext_2opt{
+        {
+        //...A -> B ...... C -> D ....
+        //...A -> C ..(r)..B -> D ...
+        next_dec_Path(A,C) <- true.
+        next_dec_Path(B,D) <- true.
+        next_dec_Path(x,y) <- dec_Path(x,y) & (Reach(y, A)) & y ~= MIN[:City].	//begining -> A
+        next_dec_Path(x,y) <- dec_Path(x,y)  & (Reach(D, x)) & D ~= MIN[:City].	//D -> the end
+        next_dec_Path(y,x) <- dec_Path(x,y) & Reach(B,x) & Reach(y,C) & y ~= MIN[:City].	//B->C
+	}
+}
+
+
+
+//~~~~~~~~~~~~~~~internal relocate
+
+vocabulary Vmove_oropt1{
+   	extern type V::City
+    A: City
+    B: City
+    pre_A: City
+    next_A: City
+    next_B: City
+}
+query getValidMoves_oropt1:V{
+	{
+        a b nexta nextb prea: a ~= b & a ~= MIN[:City] & ~dec_Path(a, b) & Reach(a, b)
+        & dec_Path(prea, a) & dec_Path(a, nexta) & dec_Path(b, nextb)
+        & (Distance(prea, nexta) + Distance(b, a) + Distance(a, nextb)
+        - Distance(prea, a) - Distance(a, nexta) - Distance(b, nextb)) < 0
+    }
+}
+
+vocabulary Vnext_oropt1{
+    extern vocabulary V
+    extern vocabulary Vmove_oropt1
+    next_dec_Path(City,City)
+}
+
+theory Tnext_oropt1:Vnext_oropt1{
+    {
+        next_dec_Path(pre_A, next_A) <- true.
+        next_dec_Path(B, A) <- true.
+        next_dec_Path(A, next_B)<-true.
+        next_dec_Path(x, y) <- dec_Path(x, y) & x ~= pre_A & y ~= next_A & x ~= B.
+    }
+}
+
+query getDeltaObj_oropt1:Vnext_oropt1{
+    {delObj :  delObj = Distance(pre_A, next_A) + Distance(B, A) + Distance(A, next_B)
+        - Distance(pre_A, A) - Distance(A, next_A) - Distance(B, next_B)
+    }
+}
+
+//~~~~~~~~~~~internal or-opt, move A-B to the middle of C-D
+vocabulary Vmove_oropt2{
+    extern type V::City
+    A: City
+    B: City
+    C: City
+    D: City
+    next_B: City
+    pre_A: City
+}
+query getValidMoves_oropt2:V{
+    {a b c d nextb prea: dec_Path(a, b) & dec_Path(c, d) & dec_Path(prea, a) & dec_Path(b, nextb)
+    & Reach(nextb, c) & nextb ~= c & a ~= MIN[:City] & b ~= MIN[:City] & nextb ~= MIN[:City]
+    & (Distance(prea, nextb) + Distance(c, b) + Distance(b, a) + Distance(a, d)
+        - Distance(prea, a) - Distance(a, b) - Distance(b, nextb) - Distance(c, d)) < 0
+    }
+}
+
+vocabulary Vnext_oropt2{
+    extern vocabulary V
+    extern vocabulary Vmove_oropt2
+    next_dec_Path(City,City)
+}
+theory Tnext_oropt2:Vnext_oropt2{
+    {
+    	next_dec_Path(pre_A, next_B) <- true.
+        next_dec_Path(C, B) <- true.
+        next_dec_Path(B, A) <- true.			//another version is not to inverse A-B
+        next_dec_Path(A, D) <- true.
+        next_dec_Path(x, y) <- dec_Path(x, y) & x ~= pre_A & x ~= A & x ~= B & x ~= C.
+        
+    }
+}
+
+query getDeltaObj_oropt2:Vnext_oropt2{
+    {delObj :  delObj = Distance(pre_A, next_B) + Distance(C, B) + Distance(B, A) + Distance(A, D)
+        - Distance(pre_A, A) - Distance(A, B) - Distance(B, next_B) - Distance(C, D)
+    }
+}
+
+//~~~~~~~~~~lns1~~~~~~~~~~~~
+vocabulary Vmove_lns1{
+    extern vocabulary V
+    rand_A: City			
+    rand_B: City
+}
+
+query getRandomVars_lns1: V{
+    { a b: Reach(a, b) & a ~= b & a ~= MIN[:City] & b ~= MIN[:City] & 
+        #{c: Reach(a, c) & Reach(c, b)} =< 10}
+}
+    
+query getMove_lns1: Vmove_lns1{
+    {x y: Reach(rand_A, x) & Reach(y, rand_B)}
+}
+
+
+//~~~~~~~~~~lns2~~~~~~~~~~~~
+vocabulary Vmove_lns2{
+    extern vocabulary V
+    rand_s: City			
+}
+
+query getRandomVars_lns2: V{
+    { s[City]: City(s) }
+}
+    
+query getMove_lns2: Vmove_lns2{    {x y: Distance(x, rand_s) =< longestEdge/7 & Distance(y, rand_s) =< longestEdge/7} }
+
+

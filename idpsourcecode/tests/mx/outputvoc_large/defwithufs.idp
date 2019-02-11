@@ -1,0 +1,29 @@
+vocabulary V{
+	type x isa int
+	p(x)
+	q(x)
+	pn
+}
+
+vocabulary Vout{
+	extern V::pn/0
+}
+
+theory T:V{
+	{
+		pn <- p(15896).
+		p(x) <- q(x).
+		q(x) <- p(x).
+	}
+}
+
+structure S:V{
+	x = {-1000000000..1000000000}
+}
+
+procedure getExpectedNbOfModels(){
+	return 1
+}
+procedure shouldNotCheck(){
+	return true;
+}

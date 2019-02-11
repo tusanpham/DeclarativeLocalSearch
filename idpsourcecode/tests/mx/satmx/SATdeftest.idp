@@ -1,0 +1,31 @@
+procedure getExpectedAModel(){
+	return true
+}
+
+vocabulary V{
+	type Num isa int
+ 
+	A(Num)
+	B(Num, Num)
+	C(Num)
+	D(Num, Num)
+	F(Num, Num)
+	Q(Num, Num)
+}
+
+theory T : V { 
+	{
+		!x[Num] y[Num]: A(x) <- (B(x, y) & ~C(y) & Q(x, y)) | D(x, y).
+		!x[Num] y[Num]: B(x, y) <- C(y) & D(x, y).
+		!x[Num] y[Num]: C(y) <- ~A(x) | B(x, y) | D(x, y).				
+		!x[Num] y[Num]: D(x, y) <- F(x, y).
+		!x[Num] y[Num]: F(x, y).
+	}
+
+	!x[Num]: 1=< sum{ y[Num] :  Q(x, y): y } =<2.
+	
+}
+
+structure S : V{ 
+	Num = {1..2}
+}

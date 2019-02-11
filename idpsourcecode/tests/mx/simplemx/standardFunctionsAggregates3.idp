@@ -1,0 +1,21 @@
+vocabulary V {
+	type t isa int
+P(t)
+d:t
+a:t
+b:t
+}
+
+theory T:V{	
+	sum(2,4,6,8)=d.
+	max(4,1,max{x:x=d:x})=a.
+	card{x:(x=d|x=a|P(x))}=b. 
+}
+structure S:V{
+t={3;4;5;6;7;20}
+P={3..6}
+}
+procedure getExpectedNbOfModels(){
+	return 1
+}
+

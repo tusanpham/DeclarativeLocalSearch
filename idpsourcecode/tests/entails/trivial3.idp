@@ -1,0 +1,12 @@
+vocabulary V{
+	
+}
+theory T1:V{
+
+}
+theory T2:V{
+	false.
+}
+procedure isEntailed(){
+	return false;
+}

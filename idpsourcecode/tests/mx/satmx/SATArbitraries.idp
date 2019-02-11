@@ -1,0 +1,19 @@
+procedure getExpectedAModel(){
+	return true
+}
+
+vocabulary V{
+	type Vtx
+	type Length isa int
+	Edge(Vtx,Vtx,Length)
+	Sp(Vtx,Vtx,Length)
+}
+
+theory T : V { 
+}
+
+structure S : V{ 
+	Vtx = { a..d }
+	Length = { 0..3 }
+	Edge = {a,b,1; a,c,2; b,d,1; c,d,1 }
+}

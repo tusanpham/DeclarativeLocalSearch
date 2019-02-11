@@ -1,0 +1,129 @@
+include <table_utils>
+
+procedure main(){
+	stdoptions.timeout = 5
+	stdoptions.liftedunitpropagation = false // To allow testing propagation of grounding by itself
+	
+	S1=groundpropagate(T,S)
+	S2=optimalpropagate(T,S)
+	S3=propagate(T,S)
+	
+	returnvalue = 1
+	if  not weakassertions(S1) then
+		returnvalue = 0
+		io.stderr:write("Groundpropagate failed.\n")
+	end
+	if not weakassertions(S3) then
+		returnvalue = 0
+		io.stderr:write("Symbolic propagation failed.\n")
+	end
+	if  not (weakassertions(S2) and strongassertions(S2)) then
+		returnvalue = 0
+		io.stderr:write("optimalpropagate failed.\n")
+	end
+	return returnvalue 
+}
+
+procedure assert(table,valuefirst,name,expected){
+	for t in tuples(table) do 
+		if t[1] == valuefirst then 
+			return true	
+		end
+	end
+	io.stderr:write("FAIL!  expected that "..name.." is certainly "..expected..", but assertion failed\n")
+	return false
+}
+
+procedure assertnot(table,valuefirst,name,expected){
+	found = false
+	for t in tuples(table) do 
+		if t[1] == valuefirst then 
+			found = true
+		end
+	end
+	if found == 1 then
+		io.stderr:write("FAIL!  expected that "..name.." is not certainly"..expected..", but assertion failed\n")
+		return false
+	end
+	return true
+}
+
+procedure assertNotEmpty(table, name){
+	for t in tuples(table) do 
+		return true
+	end
+	io.stderr:write("Expected that "..name.."is not an empty table, but it is\n")
+	return false
+}
+
+procedure assertEmpty(table, name){
+	for t in tuples(table) do 
+		io.stderr:write("Expected that "..name.."is an empty table, but it is not\n")
+		return false
+	end
+	return true
+}
+
+
+procedure assert2multi(table, values, name){
+ 	--note: order is important!!!
+	result = true
+	index = 1
+	for t in tuples(table) do 
+		currval= values[index]
+		for index2=1,#currval,1 do	
+			if t[index2] ~= currval[index2] then 
+				result = false	
+			end
+		end
+		index = index+1
+	end 
+	if result == false or #values ~= index-1 then
+		result = false
+		io.stderr:write("FAIL!  table "..name.." is not as expected\n")
+	end
+	return result
+	
+}
+
+// NOTE only arity ONE !!!
+procedure assert2(tupletable, values, name){
+	result = true
+	for i,v in ipairs(values) do
+		found = false
+		for t in tuples(tupletable) do 
+			if t[1] == v then 
+				found = true
+			end
+		end
+		if found==false then
+			result = false 
+		end
+	end 
+	if result == false then
+		io.stderr:write("FAIL!  table "..name.." was expected to be a superset of "..tabletostring(values)..", but consists of "..tostring(tupletable).."\n")
+	end
+	return result	
+}
+
+procedure consistent(expected, Struct){
+	if expected == 1 then
+		if Struct == nil then
+			io.stderr:write("Recieved no structure, hence propagation found inconsistency which was not expected\n")
+			return false
+		end
+		if isconsistent(Struct) == true then
+			return true
+		else
+			io.stderr:write("FAIL!  expected a consistent structure, but was inconsistent\n")
+			return false
+		end
+	else
+		if Struct == nil then
+			return true
+		else
+			io.stderr:write("FAIL!  expected an inconsistent structure, but was consistent\n")
+			return false
+		end
+	end
+}

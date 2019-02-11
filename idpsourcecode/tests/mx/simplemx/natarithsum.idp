@@ -1,0 +1,18 @@
+vocabulary V{
+	type t isa nat
+	x :t 
+	y :t
+	
+}
+
+theory T:V{
+	x+y=0. 
+}
+
+structure S:V{
+	t = {0..7}
+}
+
+procedure getExpectedNbOfModels(){
+	return 1
+}

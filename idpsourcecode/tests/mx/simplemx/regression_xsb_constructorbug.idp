@@ -1,0 +1,17 @@
+vocabulary V {
+    type Person constructed from {tom, jerry}
+    Shaves(Person, Person)
+}
+
+theory T : V {
+    { 	Shaves(x,y)<- (x=tom & y=tom) | (x=jerry & ~ Shaves(y,y)).
+    }
+}
+
+structure S : V {  
+
+}
+
+procedure getExpectedNbOfModels(){
+	return 0
+}

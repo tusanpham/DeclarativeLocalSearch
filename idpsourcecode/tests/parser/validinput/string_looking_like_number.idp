@@ -1,0 +1,16 @@
+vocabulary V{
+    type T isa int
+    f(T): string
+}
+
+structure S:V{
+	T = {1..2}
+	f = {
+        1->"381e429"; 
+        2->"a"; 
+    }
+}
+
+procedure main() {
+  return 1
+}

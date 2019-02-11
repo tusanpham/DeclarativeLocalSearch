@@ -1,0 +1,27 @@
+vocabulary V{
+	type t isa nat
+	p(t)
+	q(t,t)
+	r(t)
+	a
+}
+
+vocabulary Vout{
+}
+
+theory T:V{
+	!x: p(x) => (!y: r(y)) & a.
+	?x: p(x).
+	?x: r(x).
+}
+
+structure S:V{
+	t = {0..1000000000}
+}
+
+procedure getExpectedNbOfModels(){
+	return 1
+}
+procedure shouldNotCheck(){
+	return true;
+}

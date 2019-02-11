@@ -1,0 +1,48 @@
+vocabulary Vcalc {
+    type val isa float
+    type str isa string
+    type dom isa string
+
+    Xvalue(string, string, float)
+    Yvalue(string, string, float)
+    Zvalue(string, string, float)
+    //question 2) 
+    //when I try to reformulate this as functions, i.e. Xvalue(string,string): float
+    //the theory seems to be unsatisfiable (nil), what is the reason for this?
+
+    Table(dom, str, val, val)
+}
+
+structure S : Vcalc {
+    dom = {"a"; "b"}
+    Table = {	
+        "a", "m", 1.4, 23;
+        "a", "n", 1.3, 23;
+        "b", "m", 2.4, 33;
+        "b", "n", 2.5, 33;
+    }
+
+}
+
+
+theory T : Vcalc {
+    {
+        Xvalue(d, s, ll) <- Table(d, s, ll, _z).
+        Yvalue(d, s, lt) <- Table(d, s, _z, lt).
+   
+        Zvalue(d, s, z) <- Xvalue(d, s, x) & Yvalue(d, s, y) & z = 2 * x * y .
+    } //question 1) how is it possible that the collection of Zvalue is empty?
+
+}
+
+include <table_utils>
+
+procedure main(){
+    stdoptions.xsb=true
+	P = calculatedefinitions(T,S)
+    if(totable(P[Vcalc::Zvalue].ct)[1] == nil ) then
+//table is empty!
+		return -1
+	end
+	return 1
+}

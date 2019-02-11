@@ -1,0 +1,20 @@
+vocabulary V{
+	type x isa int
+	p(x)
+	q
+}
+
+query Q : V {
+	{y: y=sum(sum{:!x: p(x):1},sum{:q:2}) | y=sum(sum{:!x: p(x):1},sum{:~q:2})}
+}
+
+structure S:V{
+	x = {0..1}
+	p = {0..1}
+	q = false
+}
+
+
+procedure getExpectedSet(){
+  return {{1},{3}}
+}

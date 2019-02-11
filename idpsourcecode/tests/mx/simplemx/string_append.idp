@@ -1,0 +1,32 @@
+// TODO Bad bdd querying if LUP is on
+
+procedure append(a,b){
+	return a..b
+}
+
+vocabulary V{
+	P(string)
+	app(string,string):string
+}
+theory T:V{
+	P(app("Hello"," world")).
+}
+structure S:V{
+	app = procedure append
+}
+
+vocabulary Vout{
+	extern V::P/1
+}
+
+procedure getExpectedNbOfModels(){
+	return 1;
+}
+
+procedure shouldNotCheck(){
+	return true;
+}
+
+procedure doNotPrint(){
+	return true
+}

@@ -1,0 +1,9 @@
+vocabulary V{
+	type X
+	P(X)
+	P(X)
+}
+
+procedure main(){
+	return 1
+}

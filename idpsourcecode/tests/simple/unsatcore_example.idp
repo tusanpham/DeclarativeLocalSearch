@@ -1,0 +1,17 @@
+vocabulary V{
+	p
+}
+theory T:V{
+	{
+		p <- true.
+	}
+	~p.
+}
+
+structure S1:V{
+}
+
+procedure main(){
+	printunsatcore(T,S1)
+	return 1
+}

@@ -1,0 +1,28 @@
+include <mx>
+
+vocabulary V{
+	type Struct  
+	SPQR: Struct
+		
+	type Formula  
+	type ChildFormula isa Formula
+	P: Formula
+	
+	Tr(Struct,Formula)
+}
+theory T:V{
+	
+}
+structure S: V{
+	Struct  = { eSPQR}
+    Formula = { eP}
+    ChildFormula = { cP}
+	
+	Tr = {eSPQR,P;  } //Oeps, foutje
+	SPQR = eSPQR
+	P=eP
+}
+
+procedure main(){
+	return 1
+}

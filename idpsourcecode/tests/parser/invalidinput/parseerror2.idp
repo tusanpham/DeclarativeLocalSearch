@@ -1,0 +1,8 @@
+vocabulary V{
+	type X
+	type X isa int
+}
+
+procedure main(){
+	return 1
+}

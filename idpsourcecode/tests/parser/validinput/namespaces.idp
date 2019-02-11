@@ -1,0 +1,19 @@
+namespace test{
+	procedure a(){
+		return 1
+	}
+}
+
+procedure main(){
+	return c()
+}
+
+namespace test{
+	procedure b(){
+		return a()
+	}
+}
+
+procedure c(){
+	return test::b()
+}
